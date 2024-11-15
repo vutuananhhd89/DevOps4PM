@@ -1,9 +1,9 @@
 /** @type {import("pliny/config").PlinyConfig } */
 const siteMetadata = {
-  title: 'DevOps for PMs',
+  title: 'DevOps4PM',
   author: 'Anh Vu',
   headerTitle: 'DevOps4PM',
-  description: 'a learning journey to bring DevOps culture to teams',
+  description: 'Less headache, more value for PMs—continuous delivery of working software',
   language: 'en-us',
   theme: 'dark', // system, dark or light
   siteUrl: 'https://devops4pm.com',
