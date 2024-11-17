@@ -6,7 +6,7 @@ const siteMetadata = {
   description: 'Less headache, more value for PMs—continuous delivery of working software',
   language: 'en-us',
   theme: 'dark', // system, dark or light
-  siteUrl: 'https://devops4pm.com',
+  siteUrl: 'devops4pm.com',
   siteRepo: 'https://github.com/vutuananhhd89/DevOps4PM',
   siteLogo: `${process.env.BASE_PATH || ''}/static/images/DevOps4PM logo.png`,
   socialBanner: `${process.env.BASE_PATH || ''}/static/images/twitter-card.png`,
