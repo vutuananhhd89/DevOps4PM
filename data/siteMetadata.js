@@ -3,7 +3,7 @@ const siteMetadata = {
   title: 'DevOps4PM',
   author: 'Anh Vu',
   headerTitle: 'DevOps4PM',
-  description: 'Less headache, more value for PMs—continuous delivery of working software',
+  description: 'Continuous Value Delivery — Less headache for PMs',
   language: 'en-us',
   theme: 'dark', // system, dark or light
   siteUrl: 'https://devops4pm.com',
