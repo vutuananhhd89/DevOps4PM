@@ -1,0 +1,42 @@
+# PM Pain Points — Search Keywords
+# One keyword/phrase per line. Used by collect_reddit.py and collect_rss.py.
+# Edit freely — add, remove, or refine as you learn more.
+
+# Core pain points: technical skill gaps
+product manager technical skills
+project manager technical skills
+PM can't code
+PM technical gap
+PM struggling with DevOps
+PM struggling with CI/CD
+product manager DevOps
+project manager DevOps
+
+# Frustrations & complaints
+PM frustrated with engineering
+product manager frustrated developer
+project manager lacking technical knowledge
+non-technical PM challenges
+PM imposter syndrome technical
+PM feeling behind technical
+
+# Specific DevOps/Ops pain points
+product manager deployment
+PM read pipeline
+PM understand infrastructure
+project manager incident management
+PM monitoring dashboards
+PM SLA SLO understanding
+
+# Career & growth
+PM upskill technical
+product manager learn to code
+PM career technical skills
+PM technical credibility
+non-technical product manager advice
+
+# Team dynamics
+PM developer communication gap
+PM engineering team friction
+product manager sprint planning struggle
+PM estimating technical work

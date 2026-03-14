@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.env
+
+# Data files (collected data stays local)
+PM Pain Points/data/reddit/*.json
+PM Pain Points/data/rss/*.json
+PM Pain Points/data/manual/*.md
+!PM Pain Points/data/manual/_template.md
+PM Pain Points/reports/*.md
+PM Pain Points/reports/*.csv
+PM Pain Points/rss_feeds.json
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# npm/node (from Devvit attempt)
+node_modules/
+npm-debug.log*
+package-lock.json
+pm-paint-points/
