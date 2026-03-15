@@ -23,8 +23,12 @@ Thumbs.db
 .vscode/
 .idea/
 
-# npm/node (from Devvit attempt)
+# npm/node
 node_modules/
 npm-debug.log*
 package-lock.json
 pm-paint-points/
+
+# PMPxAI SPA (Vite/React)
+PMPxAI SPA/dist/
+*.local

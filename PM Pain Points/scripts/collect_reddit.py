@@ -1,41 +1,32 @@
 """
 collect_reddit.py — Automated Reddit PM Pain Points Collector
-Uses PRAW (Python Reddit API Wrapper) to search PM-related subreddits.
+Uses Reddit's public JSON API — no app registration or credentials needed.
 
-Setup (one-time, ~2 minutes):
-  1. Go to https://www.reddit.com/prefs/apps
-  2. Click "create another app..."
-  3. Name: "PM Pain Points Research"
-  4. Type: "script"
-  5. Redirect URI: http://localhost:8080
-  6. Copy client_id (under the app name) and client_secret
-  7. Set environment variables:
-       set REDDIT_CLIENT_ID=your_client_id
-       set REDDIT_CLIENT_SECRET=your_client_secret
-       set REDDIT_USER_AGENT=PMPainPoints/1.0
-
-Usage:
+No setup required! Just run:
   python collect_reddit.py                 # full collection
   python collect_reddit.py --test          # test connection only
   python collect_reddit.py --limit 10      # limit posts per keyword
   python collect_reddit.py --subreddit projectmanagement  # single subreddit
+
+Reddit's JSON API is freely accessible for read-only, non-commercial research.
+A descriptive User-Agent is sent as a courtesy (Reddit's robots.txt allows this).
 """
 
-import os
 import sys
 import json
+import time
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    import praw
+    import requests
 except ImportError:
-    print("ERROR: praw not installed. Run: pip install -r requirements.txt")
+    print("ERROR: requests not installed. Run: pip install -r requirements.txt")
     sys.exit(1)
 
 
-# ── Config ──────────────────────────────────────────────────────────────────
+# ── Config ───────────────────────────────────────────────────────────────────
 
 SUBREDDITS = [
     "projectmanagement",
@@ -53,8 +44,18 @@ PROJECT_DIR = SCRIPT_DIR.parent
 KEYWORDS_FILE = PROJECT_DIR / "keywords.txt"
 OUTPUT_DIR = PROJECT_DIR / "data" / "reddit"
 
+# Reddit allows ~1 req/sec for unauthenticated JSON. Stay polite.
+REQUEST_DELAY = 1.2   # seconds between requests
+MAX_RETRIES = 3
 
-# ── Helpers ─────────────────────────────────────────────────────────────────
+HEADERS = {
+    "User-Agent": "PMPainPointsResearch/1.0 (non-commercial research; contact: research@devops4pm.local)"
+}
+
+BASE_URL = "https://www.reddit.com"
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def load_keywords() -> list[str]:
     """Load search keywords from keywords.txt, ignoring comments and blanks."""
@@ -67,74 +68,130 @@ def load_keywords() -> list[str]:
     return keywords
 
 
-def get_reddit_client() -> praw.Reddit:
-    """Create a PRAW Reddit client from environment variables."""
-    client_id = os.environ.get("REDDIT_CLIENT_ID")
-    client_secret = os.environ.get("REDDIT_CLIENT_SECRET")
-    user_agent = os.environ.get("REDDIT_USER_AGENT", "PMPainPoints/1.0")
+def reddit_get(url: str, params: dict = None) -> dict | None:
+    """GET a Reddit JSON endpoint with retries and polite rate-limiting."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 429:
+                wait = 10 * attempt
+                print(f"\n  [rate-limited] Waiting {wait}s before retry {attempt}/{MAX_RETRIES}...")
+                time.sleep(wait)
+            elif resp.status_code == 403:
+                print(f"\n  [403] Private or banned subreddit, skipping.")
+                return None
+            elif resp.status_code == 404:
+                print(f"\n  [404] Not found: {url}")
+                return None
+            else:
+                print(f"\n  [HTTP {resp.status_code}] {url}")
+                time.sleep(REQUEST_DELAY * attempt)
+        except requests.RequestException as e:
+            print(f"\n  [error] {e} (attempt {attempt}/{MAX_RETRIES})")
+            time.sleep(REQUEST_DELAY * attempt)
+    return None
 
-    if not client_id or not client_secret:
-        print("ERROR: Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.")
-        print("       See this script's docstring for setup instructions.")
-        sys.exit(1)
 
-    return praw.Reddit(
-        client_id=client_id,
-        client_secret=client_secret,
-        user_agent=user_agent,
-    )
-
-
-def submission_to_dict(submission) -> dict:
-    """Convert a PRAW submission to a serializable dict."""
+def post_from_data(data: dict, keyword: str) -> dict:
+    """Convert a raw Reddit JSON post dict into our standard schema."""
+    created_utc = data.get("created_utc", 0)
     return {
-        "id": submission.id,
-        "title": submission.title,
-        "selftext": submission.selftext[:5000],  # cap body length
-        "score": submission.score,
-        "num_comments": submission.num_comments,
-        "subreddit": str(submission.subreddit),
-        "url": f"https://reddit.com{submission.permalink}",
+        "id": data.get("name", data.get("id", "")),
+        "title": data.get("title", ""),
+        "selftext": (data.get("selftext") or "")[:5000],
+        "score": data.get("score", 0),
+        "num_comments": data.get("num_comments", 0),
+        "subreddit": data.get("subreddit", ""),
+        "url": BASE_URL + data.get("permalink", ""),
         "created_utc": datetime.fromtimestamp(
-            submission.created_utc, tz=timezone.utc
-        ).isoformat(),
-        "author": str(submission.author) if submission.author else "[deleted]",
+            float(created_utc), tz=timezone.utc
+        ).isoformat() if created_utc else "",
+        "author": data.get("author", "[deleted]"),
+        "search_keyword": keyword,
         "top_comments": [],
     }
 
 
-def fetch_top_comments(submission, max_comments: int = 5) -> list[dict]:
-    """Fetch the top-level comments sorted by score."""
-    submission.comment_sort = "best"
-    submission.comments.replace_more(limit=0)
+def fetch_top_comments(permalink: str, max_comments: int = 5) -> list[dict]:
+    """Fetch top-level comments for a post via the JSON thread endpoint."""
+    url = BASE_URL + permalink + ".json"
+    data = reddit_get(url, params={"limit": max_comments, "depth": 1, "sort": "best"})
+    time.sleep(REQUEST_DELAY)
+
     comments = []
-    for comment in submission.comments[:max_comments]:
-        comments.append({
-            "author": str(comment.author) if comment.author else "[deleted]",
-            "body": comment.body[:2000],
-            "score": comment.score,
-        })
+    if not data or not isinstance(data, list) or len(data) < 2:
+        return comments
+
+    try:
+        children = data[1]["data"]["children"]
+        for child in children[:max_comments]:
+            if child.get("kind") != "t1":
+                continue
+            cd = child["data"]
+            body = cd.get("body", "")
+            if body in ("[deleted]", "[removed]", ""):
+                continue
+            comments.append({
+                "author": cd.get("author", "[deleted]"),
+                "body": body[:2000],
+                "score": cd.get("score", 0),
+            })
+    except (KeyError, TypeError, IndexError):
+        pass
+
     return comments
 
 
-# ── Main Logic ──────────────────────────────────────────────────────────────
+def search_subreddit(sub_name: str, keyword: str, limit: int = 25) -> list[dict]:
+    """Search a subreddit for a keyword using the public JSON search endpoint."""
+    url = f"{BASE_URL}/r/{sub_name}/search.json"
+    params = {
+        "q": keyword,
+        "restrict_sr": 1,   # stay within this subreddit
+        "sort": "relevance",
+        "t": "year",
+        "limit": min(limit, 100),  # Reddit cap is 100
+    }
+    data = reddit_get(url, params=params)
+    time.sleep(REQUEST_DELAY)
 
-def test_connection(reddit: praw.Reddit):
-    """Quick test that the Reddit connection works."""
-    print("Testing Reddit connection...")
+    if not data:
+        return []
+
+    posts = []
     try:
-        sub = reddit.subreddit("projectmanagement")
-        hot = list(sub.hot(limit=1))
-        print(f"  [OK] Connected! Found post: \"{hot[0].title[:60]}...\"")
-        print(f"  [OK] Subreddit: r/{sub.display_name} ({sub.subscribers:,} subscribers)")
-        print("  [OK] Connection test passed.")
-    except Exception as e:
-        print(f"  [FAIL] Connection failed: {e}")
-        sys.exit(1)
+        for child in data["data"]["children"]:
+            if child.get("kind") != "t3":
+                continue
+            posts.append(child["data"])
+    except (KeyError, TypeError):
+        pass
+
+    return posts
+
+
+# ── Main Logic ────────────────────────────────────────────────────────────────
+
+def test_connection():
+    """Quick test that the Reddit JSON API is reachable."""
+    print("Testing Reddit JSON API connection...")
+    url = f"{BASE_URL}/r/projectmanagement/hot.json"
+    data = reddit_get(url, params={"limit": 1})
+    if data:
+        children = data.get("data", {}).get("children", [])
+        if children:
+            title = children[0]["data"].get("title", "?")[:60]
+            print(f"  [OK] Connected! Found post: \"{title}...\"")
+            print( "  [OK] No credentials required - using public JSON API")
+            print( "  [OK] Connection test passed.")
+            return
+    print("  [FAIL] Could not reach Reddit. Check your internet connection.")
+    sys.exit(1)
 
 
 def collect(
-    reddit: praw.Reddit,
     subreddits: list[str],
     keywords: list[str],
     limit: int = 25,
@@ -149,35 +206,29 @@ def collect(
     current = 0
 
     for sub_name in subreddits:
-        try:
-            subreddit = reddit.subreddit(sub_name)
-            # Verify subreddit exists
-            _ = subreddit.id
-        except Exception as e:
-            print(f"  [!] Skipping r/{sub_name}: {e}")
-            continue
-
         for keyword in keywords:
             current += 1
-            print(f"  [{current}/{total_searches}] r/{sub_name} → \"{keyword}\"", end="")
+            print(f"  [{current}/{total_searches}] r/{sub_name} -> \"{keyword}\"", end="", flush=True)
 
-            try:
-                results = subreddit.search(keyword, sort="relevance", time_filter="year", limit=limit)
-                count = 0
-                for submission in results:
-                    if submission.id in seen_ids:
-                        continue
-                    seen_ids.add(submission.id)
+            raw_posts = search_subreddit(sub_name, keyword, limit=limit)
+            count = 0
 
-                    post = submission_to_dict(submission)
-                    post["search_keyword"] = keyword
-                    post["top_comments"] = fetch_top_comments(submission)
-                    all_results.append(post)
-                    count += 1
+            for raw in raw_posts:
+                post_id = raw.get("name") or raw.get("id")
+                if post_id in seen_ids:
+                    continue
+                seen_ids.add(post_id)
 
-                print(f" → {count} new posts")
-            except Exception as e:
-                print(f" → ERROR: {e}")
+                post = post_from_data(raw, keyword)
+
+                # Only fetch comments for posts with actual discussion
+                if raw.get("num_comments", 0) > 0:
+                    post["top_comments"] = fetch_top_comments(raw.get("permalink", ""))
+
+                all_results.append(post)
+                count += 1
+
+            print(f" -> {count} new posts")
 
     # Save results
     output_file = OUTPUT_DIR / f"reddit_{timestamp}.json"
@@ -191,21 +242,19 @@ def collect(
     return all_results
 
 
-# ── CLI ─────────────────────────────────────────────────────────────────────
+# ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Collect PM pain point posts from Reddit"
+        description="Collect PM pain point posts from Reddit (no credentials needed)"
     )
     parser.add_argument("--test", action="store_true", help="Test connection only")
     parser.add_argument("--limit", type=int, default=25, help="Max posts per keyword per subreddit (default: 25)")
     parser.add_argument("--subreddit", type=str, help="Search a single subreddit only")
     args = parser.parse_args()
 
-    reddit = get_reddit_client()
-
     if args.test:
-        test_connection(reddit)
+        test_connection()
         return
 
     keywords = load_keywords()
@@ -214,7 +263,7 @@ def main():
     subs = [args.subreddit] if args.subreddit else SUBREDDITS
     print(f"Searching {len(subs)} subreddits with limit={args.limit} per search\n")
 
-    collect(reddit, subs, keywords, limit=args.limit)
+    collect(subs, keywords, limit=args.limit)
 
 
 if __name__ == "__main__":

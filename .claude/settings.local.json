@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import requests; print\\(''requests package is installed''\\)\")",
+      "Bash(python collect_reddit.py --test)",
+      "Bash(python analyze.py)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(pip install:*)",
+      "Bash(python analyze.py --llm)",
+      "WebFetch(domain:groq.com)",
+      "WebFetch(domain:ollama.com)",
+      "WebFetch(domain:console.groq.com)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebSearch",
+      "WebFetch(domain:community.groq.com)",
+      "WebFetch(domain:www.aifreeapi.com)",
+      "WebFetch(domain:yingtu.ai)",
+      "WebFetch(domain:www.zilgist.com)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
