@@ -18,7 +18,28 @@
       "WebFetch(domain:yingtu.ai)",
       "WebFetch(domain:www.zilgist.com)",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebFetch(domain:thepersimmongroup.com)",
+      "WebFetch(domain:www.pmi.org)",
+      "WebFetch(domain:staragile.com)",
+      "WebFetch(domain:hbr.org)",
+      "WebFetch(domain:www.hau.gr)",
+      "WebFetch(domain:www.project-management-prepcast.com)",
+      "WebFetch(domain:www.projectmanagement.com)",
+      "WebFetch(domain:pmpwithray.com)",
+      "WebFetch(domain:knowlettwoods.com)",
+      "WebFetch(domain:pmwares.com)",
+      "WebFetch(domain:mpug.com)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:old.reddit.com)",
+      "WebFetch(domain:libreddit.kavin.rocks)",
+      "WebFetch(domain:redlib.catsarch.com)",
+      "WebFetch(domain:teddit.net)",
+      "WebFetch(domain:pullpush.io)",
+      "WebFetch(domain:api.pullpush.io)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(cd:*)"
     ]
   }
 }
